@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messaging</title>
+</head>
+<body>
+    <h2>Send Message</h2>
+    <form id="messageForm">
+        <label for="toUser">To:</label>
+        <input type="text" id="toUser" name="toUser" required>
+        <label for="message">Message:</label>
+        <input type="text" id="message" name="message" required>
+        <button type="submit">Send</button>
+    </form>
+    <div id="messageResult"></div>
+
+    <script>
+        // Example sending function, adjust to your project's needs
+        document.getElementById('messageForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const toUser = document.getElementById('toUser').value;
+            const message = document.getElementById('message').value;
+
+            // Placeholder: In a real application, you'd send this to the server or directly to the peer
+            console.log(`Sending message to ${toUser}: ${message}`);
+            document.getElementById('messageResult').textContent = `Message sent to ${toUser}: ${message}`;
+        });
+    </script>
+</body>
+</html>
