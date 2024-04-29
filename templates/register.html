@@ -9,29 +9,39 @@
     <h2>Register</h2>
     <form id="registrationForm">
         <label for="username">Username:</label>
-        <input type="text" id="username" name="username" required>
+        <input type="text" id="username" name="username" required><br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required><br>
         <button type="submit">Register</button>
     </form>
     <div id="registrationResult"></div>
+
+    <p>Already registered? <a href="/login">Log in here</a>.</p>
 
     <script>
         document.getElementById('registrationForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
 
-            fetch('http://127.0.0.1:5000/register', {
+            fetch('/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ username: username, port: 65432 }), // Assuming port is constant for simplification
+                body: JSON.stringify({ username: username, password: password, port : 65432 }),
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('registrationResult').textContent = 'Registration successful: ' + JSON.stringify(data);
+                if (data.message) {
+                    document.getElementById('registrationResult').textContent = data.message;
+                    window.location.href = '/login';
+                } else if (data.error) {
+                    document.getElementById('registrationResult').textContent = data.error;
+                }
             })
             .catch((error) => {
-                document.getElementById('registrationResult').textContent = 'Registration failed.';
+                document.getElementById('registrationResult').textContent = 'Registration failed due to a network error.';
             });
         });
     </script>

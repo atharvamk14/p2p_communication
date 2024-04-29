@@ -1,11 +1,14 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.exc import IntegrityError  # Import for handling unique constraint errors
+from flask import render_template
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+
 
 app = Flask(__name__)
-# Configure the SQLite database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///p2p_messaging.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = "abcdef"
 db = SQLAlchemy(app)
 
 class User(db.Model):
@@ -13,42 +16,85 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     ip_address = db.Column(db.String(120), nullable=False)
     port = db.Column(db.Integer, nullable=False)
+    password = db.Column(db.String(128), nullable=False)
 
-    def __repr__(self):
-        return f'<User {self.username}>'
-
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
 @app.route('/')
 def home():
-    return render_template('register.html')
+    return render_template('register.html')   
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    username = data.get('username')
-    port = data.get('port')
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
     ip_address = request.remote_addr
-    # Check if the user already exists
+    port = data['port']
+    
     if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Username already exists"}), 409
-    user = User(username=username, ip_address=ip_address, port=port)
+        return jsonify({'error': 'Username already exists'}), 409
+    user = User(username=username, ip_address=ip_address, port=port, password=password)
     db.session.add(user)
-    try:
-        db.session.commit()
-        return jsonify({"message": f"{username} registered successfully!"})
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({"error": "This username is already taken."}), 400
+    db.session.commit()
+    return jsonify({"message": "Registration successful"})
 
 @app.route('/lookup', methods=['GET'])
 def lookup():
     username = request.args.get('username')
     user = User.query.filter_by(username=username).first()
     if user:
-        return jsonify({"ip_address": user.ip_address, "port": user.port})
+        return jsonify({'ip_address': user.ip_address, 'port': user.port})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/login', methods=['GET'])
+def show_login():
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def process_login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    user = User.query.filter_by(username=username).first()
+    if user and user.password == password:
+        session['user_id'] = user.id  # Store user info in session
+        session['username'] = username
+        return jsonify({"message": "Login successful!", "redirect": "/chats"})
     else:
-        return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "Invalid username or password"}), 401
+    
+@app.route('/chats')
+def chats():
+    if 'user_id' not in session:
+        return redirect('/login')  # Redirect to login if not authenticated
+    return render_template('messaging.html')  # Load the chat interface
+
+@app.route('/users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    return jsonify([{'id': user.id, 'username': user.username} for user in users])
+
+@app.route('/messages', methods=['POST', 'GET'])
+def handle_messages():
+    if request.method == 'POST':
+        data = request.get_json()
+        new_message = Message(sender_id=session['user_id'], receiver_id=data['toUser'], content=data['message'])
+        db.session.add(new_message)
+        db.session.commit()
+        return jsonify({'message': 'Message sent successfully'})
+    elif request.method == 'GET':
+        messages = Message.query.filter((Message.sender_id == session['user_id']) | (Message.receiver_id == session['user_id'])).all()
+        return jsonify([{'sender': msg.sender_id, 'receiver': msg.receiver_id, 'content': msg.content, 'timestamp': msg.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for msg in messages])
+
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Ensure tables are created.
+        db.create_all()
     app.run(debug=True)
+

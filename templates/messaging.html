@@ -4,29 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messaging</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        #leftPanel, #rightPanel {
+            height: 90vh;
+            overflow: auto;
+        }
+        #leftPanel { width: 40%; float: left; }
+        #rightPanel { width: 60%; float: right; }
+    </style>
 </head>
-<body>
-    <h2>Send Message</h2>
-    <form id="messageForm">
-        <label for="toUser">To:</label>
-        <input type="text" id="toUser" name="toUser" required>
-        <label for="message">Message:</label>
-        <input type="text" id="message" name="message" required>
-        <button type="submit">Send</button>
-    </form>
-    <div id="messageResult"></div>
+<body onload="fetchUsers(); fetchMessages();">
+    <div id="leftPanel">
+        <!-- Chat history will be dynamically filled -->
+    </div>
+    <div id="rightPanel">
+        <h2>Send Message</h2>
+        <form id="messageForm">
+            <div class="form-group">
+                <label for="toUser">To:</label>
+                <select id="toUser" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" class="form-control" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+    </div>
 
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script>
-        // Example sending function, adjust to your project's needs
-        document.getElementById('messageForm').addEventListener('submit', function(e) {
+        function fetchUsers() {
+            fetch('/users').then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('toUser');
+                data.forEach(user => {
+                    let option = new Option(user.username, user.id);
+                    select.add(option);
+                });
+            });
+        }
+
+        function fetchMessages() {
+            fetch('/messages').then(response => response.json())
+            .then(data => {
+                const chatPanel = document.getElementById('leftPanel');
+                data.forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.textContent = `${msg.sender} to ${msg.receiver}: ${msg.content} at ${msg.timestamp}`;
+                    chatPanel.appendChild(messageDiv);
+                });
+            });
+        }
+
+        function sendMessage(e) {
             e.preventDefault();
             const toUser = document.getElementById('toUser').value;
             const message = document.getElementById('message').value;
+            fetch('/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ toUser: toUser, message: message }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message);  // Log the response from the server
+                fetchMessages();  // Refresh messages
+            });
+        }
 
-            // Placeholder: In a real application, you'd send this to the server or directly to the peer
-            console.log(`Sending message to ${toUser}: ${message}`);
-            document.getElementById('messageResult').textContent = `Message sent to ${toUser}: ${message}`;
-        });
+        document.getElementById('messageForm').addEventListener('submit', sendMessage);
     </script>
 </body>
 </html>
