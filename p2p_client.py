@@ -7,7 +7,8 @@ import logging
 from requests.exceptions import HTTPError, ConnectionError, RequestException
 import tkinter as tk
 from tkinter import simpledialog
-
+import rq
+from redis import Redis
 
 # Configuration
 DISCOVERY_SERVER = 'http://127.0.0.1:5000'
@@ -15,6 +16,9 @@ LOCAL_IP = '127.0.0.1'
 LISTEN_PORT = 65432  # Example port
 KEY = Fernet.generate_key()
 CIPHER = Fernet(KEY)
+
+redis_conn = Redis()
+queue = rq.Queue(connection=redis_conn)
 
 def register(username, password):
     """Register the client with the discovery server, including error handling and password support."""
@@ -64,9 +68,19 @@ def send_message(target_ip, target_port, message):
         queue_message(target_ip, target_port, message)
 
 def queue_message(target_ip, target_port, message):
-    # Placeholder for queuing mechanism
-    # You could use a local database or a file to store messages
-    pass
+    job = queue.enqueue(send_message, target_ip, target_port, message, job_timeout=300)
+    print(f"Message queued with job ID: {job.id}")
+
+def handle_queued_messages():
+    while True:
+        jobs = queue.jobs
+        for job in jobs:
+            try:
+                result = job.perform()
+                if result:
+                    job.delete()
+            except Exception as e:
+                print(f"Error sending queued message: {e}")
 
 def receive_messages():
     """Listen for incoming messages and decrypt them."""
@@ -106,6 +120,7 @@ send_btn = tk.Button(root, text="Send Message", command=gui_send_message)
 send_btn.pack(pady=20)
 
 root.mainloop()
+threading.Thread(target=handle_queued_messages, daemon=True).start()
 
 # Main execution
 if __name__ == "__main__":

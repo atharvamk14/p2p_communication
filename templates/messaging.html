@@ -39,6 +39,7 @@
             fetch('/users').then(response => response.json())
             .then(data => {
                 const select = document.getElementById('toUser');
+                select.innerHTML='';
                 data.forEach(user => {
                     let option = new Option(user.username, user.id);
                     select.add(option);
@@ -50,6 +51,7 @@
             fetch('/messages').then(response => response.json())
             .then(data => {
                 const chatPanel = document.getElementById('leftPanel');
+                chatPanel.innerHTML = '';
                 data.forEach(msg => {
                     const messageDiv = document.createElement('div');
                     messageDiv.textContent = `${msg.sender} to ${msg.receiver}: ${msg.content} at ${msg.timestamp}`;

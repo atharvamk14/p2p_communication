@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask import render_template
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import rq
+from redis import Redis
+from rq.job import Job
 
 
 app = Flask(__name__)
@@ -10,6 +12,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///p2p_messaging.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = "abcdef"
 db = SQLAlchemy(app)
+redis_conn = Redis()
+queue = rq.Queue(connection=redis_conn)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -92,6 +97,11 @@ def handle_messages():
         messages = Message.query.filter((Message.sender_id == session['user_id']) | (Message.receiver_id == session['user_id'])).all()
         return jsonify([{'sender': msg.sender_id, 'receiver': msg.receiver_id, 'content': msg.content, 'timestamp': msg.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for msg in messages])
 
+@app.route('/queued_messages')
+def view_queued_messages():
+    jobs = queue.jobs  # Retrieves all jobs in the queue
+    messages = [{'id': job.id, 'status': job.get_status()} for job in jobs]
+    return jsonify(messages)
 
 if __name__ == '__main__':
     with app.app_context():
