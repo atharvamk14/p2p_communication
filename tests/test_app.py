@@ -1,4 +1,6 @@
 import pytest
+import sys
+sys.path.append('..')  # Adds the upper directory to the path to find discovery_server
 from discovery_server import app, db, User, Message
 from datetime import datetime
 
